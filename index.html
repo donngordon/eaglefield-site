@@ -354,7 +354,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:20px;justify-content:space-between;
   <form class="demo" id="demoForm" novalidate>
     <label>Your name<input id="fName" name="name" autocomplete="name" required></label>
     <label>Company<input id="fCo" name="company" autocomplete="organization" required></label>
-    <label>Work email<input id="fEmail" name="email" type="email" autocomplete="email" required></label>
+    <label>Work email<input id="fEmail" name="email" type="email" autocomplete="email" required placeholder="you@yourcompany.com"></label>
     <label>Phone<input id="fPhone" name="phone" type="tel" autocomplete="tel"></label>
     <label>Your role<select id="fRole" name="role"><option>Owner</option><option>General manager</option><option>Operations / office manager</option><option>Other</option></select></label>
     <label>Using today<select id="fNow" name="current"><option>ServiceTitan</option><option>Jobber</option><option>Housecall Pro</option><option>FieldEdge</option><option>Service Fusion</option><option>Workiz</option><option>Paper / spreadsheets</option><option>Other</option></select></label>
@@ -432,7 +432,10 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:20px;justify-content:space-between;
     ev.preventDefault();var msg=$('formMsg');
     if($('fWebsite').value)return;
     var name=$('fName').value.trim(),co=$('fCo').value.trim(),email=$('fEmail').value.trim();
-    if(!name||!co||!/^\S+@\S+\.\S+$/.test(email)){msg.style.color='var(--bad)';msg.textContent='Enter your name, company and a valid work email.';return}
+    var ev2=window.efCheckEmail?window.efCheckEmail(email):(/^\S+@\S+\.\S+$/.test(email)?'ok':'invalid');
+    if(!name||!co||ev2==='invalid'){msg.style.color='var(--bad)';msg.textContent='Enter your name, company and a valid work email.';return}
+    if(ev2==='personal'){msg.style.color='var(--bad)';msg.textContent='Please use your company email address. Personal addresses like Gmail, Yahoo or Outlook can\'t request a demo.';$('fEmail').focus();$('fEmail').setAttribute('aria-invalid','true');return}
+    $('fEmail').removeAttribute('aria-invalid');
     msg.style.color='var(--muted)';msg.textContent='Sending…';
     var lead={name:name,company:co,email:email,phone:$('fPhone').value.trim(),trade:$('fTrade').value,role:$('fRole').value,current:$('fNow').value,techs:+$('fTechs').value||null};
     var req=apiUrl?fetch(apiUrl.replace(/\/$/,'')+'/public/leads',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(lead)})
@@ -444,6 +447,7 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:20px;justify-content:space-between;
 })();
 </script>
 
+<script src="/assets/email-check.js"></script>
 <script src="/assets/motion.js" defer></script>
 </body>
 </html>
