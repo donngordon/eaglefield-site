@@ -1,0 +1,56 @@
+name: Android demo app
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["demo-2ac5410a2836/index.html", "mobile/**", ".github/workflows/android-demo.yml"]
+permissions:
+  contents: write
+concurrency: android-demo
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install Capacitor
+        working-directory: mobile
+        run: npm install --no-audit --no-fund
+      - name: Copy the demo into the app
+        working-directory: mobile
+        run: |
+          rm -rf www && mkdir -p www/assets
+          cp -r ../demo-2ac5410a2836/. www/
+          rm -f www/*.apk
+          cp ../assets/guard.js www/assets/guard.js
+      - name: Create the Android project
+        working-directory: mobile
+        run: |
+          npx cap add android
+          npx cap sync android
+      - name: Eagle icon and app name
+        working-directory: mobile
+        run: |
+          RES=android/app/src/main/res
+          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do cp icons/mipmap-$d/*.png $RES/mipmap-$d/; done
+          cp icons/ic_launcher_background.xml $RES/values/ic_launcher_background.xml
+          grep -q '<string name="app_name">Eagle Field</string>' $RES/values/strings.xml
+      - name: Build the APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+      - name: Publish the APK on the private demo page
+        run: |
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk demo-2ac5410a2836/eagle-field-demo.apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add demo-2ac5410a2836/eagle-field-demo.apk
+          git commit -m "Android demo app build" || exit 0
+          git push

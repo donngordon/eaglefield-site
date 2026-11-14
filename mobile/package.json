@@ -1,0 +1,13 @@
+{
+  "name": "eagle-field-demo-android",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Builds the Eagle Field demo as an Android app (APK) with the eagle icon.",
+  "devDependencies": {
+    "@capacitor/cli": "7.6.10"
+  },
+  "dependencies": {
+    "@capacitor/core": "7.6.10",
+    "@capacitor/android": "7.6.10"
+  }
+}
