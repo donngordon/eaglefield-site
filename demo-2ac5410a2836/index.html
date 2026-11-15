@@ -255,6 +255,10 @@ td input,td select{background:var(--sunk);border:1px solid var(--line);border-ra
 .qcard{display:flex;gap:18px;align-items:center;flex-wrap:wrap;padding:16px;border-radius:12px;background:var(--warn-soft)}
 .qbig{display:flex;flex-direction:column;align-items:center;min-width:110px;padding:8px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--line)}
 .qbig b{font-family:var(--f-display);font-size:46px;line-height:1;color:var(--accent)}
+.insp-sheet{position:fixed;z-index:41;inset:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));margin:0 auto;max-width:860px;overflow:auto;background:var(--surface);color:var(--ink);border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:12px;border:1px solid var(--line);box-shadow:0 30px 80px rgba(0,0,0,.4)}
+.insp-sheet input,.insp-sheet select{font-size:16px;min-height:42px}
+.insp-h{margin:6px 0 0;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.insp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
 /* Video Assist demo */
 .va-back{position:fixed;inset:0;background:rgba(8,18,28,.6);z-index:40}
 .va-wrap{position:fixed;z-index:41;inset:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:16px;overflow:auto}
@@ -399,6 +403,7 @@ td input,td select{background:var(--sunk);border:1px solid var(--line);border-ra
 <div id="toast" hidden></div>
 <div id="trackOverlay" hidden></div>
 <div id="vaOverlay" hidden></div>
+<div id="inspOverlay" hidden></div>
 
 <script src="lib/zxing.min.js"></script>
 <script src="lib/JsBarcode.all.min.js"></script>
@@ -724,12 +729,39 @@ function seed(){
   e.lines=[line('Maintenance tune-up',1),line('Clear condensate drain line',1)];e.invoice={number:'INV-'+e.id.slice(3),signedBy:'Omar Haddad',paidMethod:'Check',paidAt:now(),member:{name:'Platinum',discount:20,waiveDiag:true}};
   e.workSummary='Fall tune-up completed. Cleaned burners and flame sensor, checked heat exchanger, cleared the condensate drain line, and verified safe operation.';
   e.debrief={mode:'video',submitted:now()};e.closedAt=now();e.closedSeen=true;['Call received','Dispatched to '+tech(t2).name,'Arrived on site','Invoice paid by check','Video debrief sent to manager','Closed out by manager'].forEach(m=>log(e,m));S.jobs.push(e);
+  seedInspectionExamples();
+}
+function seedInspectionExamples(){
+  /* Made-up customers (not real people) showing the inspection workflow: a two-system tune-up, a compressor replacement request, and a safety finding with follow-up. */
+  S.inspSeeded=true;const t0=S.techs[0].id,d=today();
+  const nb=findOrMakeCustomer('Natalie Brooks','(555) 238-4410','14 Willow Bend Ct',true);
+  if(!nb.equipment.length)nb.equipment.push({type:'Heat pump',brand:'Carrier',model:'25HCB636',year:'2018',fuel:'electric',location:'Side yard'},{type:'Gas furnace',brand:'Lennox',model:'EL296V',year:'2016',fuel:'gas',location:'Basement'});
+  const a=blankJob({example:true,customerId:nb.id,customer:nb.name,phone:nb.phone,address:nb.address,source:'membership',transcript:'Caller: It is time for our fall maintenance on both systems, the Carrier heat pump upstairs and the Lennox gas furnace in the basement.\nCaller: The gate code is 2207 and our dog is friendly. Please call 20 minutes before you come.'});
+  a.summary=ruleSummary(a.transcript);a.summaryBy='rules';a.check={acks:{},local:[],aiState:'off',confirmed:true,confirmedAt:now()};a.techId=t0;a.status='onsite';a.schedule={date:d,start:'13:00',end:'15:00'};
+  ['Call received','Summary verified by dispatcher','Dispatched to '+tech(t0).name,'Arrived on site'].forEach(m=>log(a,m));S.jobs.push(a);
+  const tb=findOrMakeCustomer('Tom Brennan','(555) 671-3392','5 Quarry Hill Rd',true);
+  if(!tb.equipment.length)tb.equipment.push({type:'Air conditioner',brand:'American Standard',model:'4A7A6036',year:'2013',fuel:'electric',location:'Back patio'});
+  const b=blankJob({example:true,customerId:tb.id,customer:tb.name,phone:tb.phone,address:tb.address,transcript:'Caller: Your technician said our American Standard air conditioner needs a new compressor. We approved the estimate and want to schedule the replacement.\nCaller: The unit is about 12 years old and sits on the back patio. Mornings work best.'});
+  log(b,'Call received');S.jobs.push(b);
+  const rd=findOrMakeCustomer('Rosa Delgado','(555) 482-0175','220 Sycamore Ln',true);
+  if(!rd.equipment.length)rd.equipment.push({type:'Gas furnace',brand:'Goodman',model:'GMS80703BN',year:'2009',fuel:'gas',location:'Utility closet'});
+  const c=blankJob({example:true,customerId:rd.id,customer:rd.name,phone:rd.phone,address:rd.address,transcript:'Caller: We smell something when the furnace starts and want it checked before winter. It is a Goodman gas furnace in the utility closet.',status:'closed'});
+  c.summary=ruleSummary(c.transcript);c.summaryBy='rules';c.check={acks:{},local:[],aiState:'off',confirmed:true};c.techId=t0;c.schedule={date:addDays(d,-2),start:'08:00',end:'10:00'};
+  c.inspections={0:{status:'submitted',version:1,versions:[{v:1,by:tech(t0).name,at:addDays(d,-2)+'T10:05:00',reason:'Submitted'}],
+    answers:{equipment_label:{value:'Utility closet furnace'},make:{value:'Goodman'},equipment_type:{value:'Gas furnace'},model:{value:'GMS80703BN'},fuel:{value:'Natural gas'},mode:{value:'Heating'},conditions:{value:'Call for heat at thermostat, 15 min run'},
+      return_temperature:{value:67},supply_temperature:{value:114},ambient_co:{value:0},flue_co:{value:null},
+      filter:{result:'attention',reason:'Heavily loaded 16x25x1; replaced'},blower:{result:'pass'},venting:{result:'fail',reason:'Flue joint separated at the draft hood'},gas_piping:{result:'pass'},ignition:{result:'pass'},safety_controls:{result:'pass'},drain:{result:'not_applicable'},wiring:{result:'pass'},shutoff:{result:'pass'},iaq:{result:'not_tested',reason:'Customer declined IAQ check'}},
+    closeout:{attest:true,reviewed:true,debrief:'Walked through on site; furnace left off until flue is re-secured',next:'Return visit scheduled to re-secure flue',sign:'Signed on tablet',notes:'Customer prefers texts. Closet door sticks.'}}};
+  c.findings=[{i:0,component:'Venting',observation:'Flue pipe separated at the draft hood connection',severity:'safety',recommendation:'Re-secure and seal flue connection; recheck ambient CO after repair',state:'confirmed',followUp:'Return visit '+addDays(d,1)+' (parts on hand)'}];
+  c.lines=[line('Diagnostic fee',1)];c.closedAt=now();c.closedSeen=true;
+  ['Call received','Dispatched to '+tech(t0).name,'Arrived on site','Inspection submitted: Gas furnace','Finding: Venting (safety)','Closed out by manager; return visit scheduled'].forEach(m=>log(c,m));S.jobs.push(c);
 }
 function migrate(){
   S.efPlan=S.efPlan||'elite';S.memberPlans=S.memberPlans||JSON.parse(JSON.stringify(DEFAULT_PLANS));
   (S.customers||[]).forEach(c=>{if(c.plan&&!c.membership)c.membership={planId:'gold',billing:'monthly',start:addDays(today(),-120),status:'active'};delete c.plan});
   S.customers=S.customers||[];S.tax=S.tax??6;S.moves=S.moves||[];S.counts=S.counts||[];
   if(!S.pricebook)S.pricebook=makePB(S.industry);
+  if(!S.inspSeeded&&(S.jobs||[]).some(j=>j.example)&&S.techs&&S.techs.length){try{seedInspectionExamples()}catch(e){console.warn(e)}}S.inspSeeded=true;
   S.pricebook.forEach(p=>{if(p.type==='Part'){if(!p.sku)p.sku=genSku();p.stock=p.stock||{shop:0};p.reorder=p.reorder??3}});
   (PRICEBOOK[S.industry]||[]).forEach(([name,type,price])=>{if(type==='Part'&&!S.pricebook.some(p=>p.name===name))S.pricebook.push({id:uid('p'),name,type,price,sku:genSku(),stock:{shop:10},reorder:3})});
   if(!S.suppliers)seedSuppliers();S.pickups=S.pickups||[];
@@ -869,6 +901,7 @@ function dispatchDetail(j){
       <div class="row"><button class="btn primary big" data-act="dispatch" data-id="${j.id}" ${g.ok?'':'disabled'}>Dispatch verified summary</button>${g.ok?'':`<span class="note">${esc(g.why)}</span>`}</div>`
     :`<p style="margin:0">Assigned to <b>${esc(t?t.name:'—')}</b> · ${esc(schedTxt(j))}</p>${j.enroute&&j.status==='dispatched'?`<div class="banner ok" style="font-weight:400"><span><b>On the way.</b> ${esc(j.customer.split(' ')[0])} can follow the van live.</span><button class="btn sm" data-act="track-preview" data-id="${j.id}">Preview customer view</button></div>`:''}${customerTexts(j)}`}
    </div>
+   ${inspPanel(j,true)}
    ${checkPanel(j)}
    ${summaryCard(j,{editable:j.status==='new'})}
    ${historyPanel(j)}
@@ -971,6 +1004,7 @@ function techJob(j,queue){
     ${j.status==='dispatched'&&!j.enroute?`<div class="row"><button class="btn primary big" data-act="enroute" data-id="${j.id}">On my way</button><button class="btn" data-act="back-queue">Back to my jobs</button></div>`:''}
     ${j.status==='dispatched'&&j.enroute?`<div class="banner ok" style="font-weight:400"><span><b>Sharing your location with ${esc(j.customer.split(' ')[0])}</b> until you tap Arrived. It stops automatically.</span></div><div class="row"><button class="btn primary big" data-act="start-job" data-id="${j.id}">I've arrived · Start job</button><button class="btn" data-act="track-preview" data-id="${j.id}">See what the customer sees</button></div>`:''}
    </div>
+   ${inspPanel(j,false)}
    ${['debrief','review'].includes(j.status)?debriefArea(j):''}
    ${summaryCard(j,{tech:true})}
    ${j.status==='onsite'?workArea(j,tab,total):''}
@@ -1101,6 +1135,75 @@ function vaSnapshot(v){
   const svg=vaScene(v).replace('<svg ','<svg xmlns="http://www.w3.org/2000/svg" ').replace(/class="va-led"/,'');
   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
+/* ---------- System inspections (demo of the real app's inspection rules) ---------- */
+const INSP_FIELDS=[["equipment_label","Equipment/system name","t","","a",1],["make","Manufacturer","t","","a",1],["equipment_type","Type of unit","t","","a",1],["model","Model","t","","a",0],["serial","Serial","t","","a",0],["fuel","Fuel type","t","","a",0],["refrigerant","Refrigerant","t","","a",0],["filter_size","Filter size","t","","a",0],["thermostat","Thermostat","t","","a",0],["mode","Operating mode","t","","a",0],["conditions","Test conditions","t","","a",0],["manufacturer_reference","Manufacturer specification reference","t","","a",0],["return_temperature","Return temperature","n","°F","a",0],["supply_temperature","Supply temperature","n","°F","a",0],["outdoor_temperature","Outdoor temperature","n","°F","a",0],["blower_amps_rated","Blower nameplate amps","n","A","a",0],["blower_amps_actual","Blower measured amps","n","A","a",0],["compressor_amps_rated","Compressor nameplate amps","n","A","a",0],["compressor_amps_actual","Compressor measured amps","n","A","a",0],["fan_amps_rated","Fan nameplate amps","n","A","a",0],["fan_amps_actual","Fan measured amps","n","A","a",0],["capacitor_compressor_rated","Compressor capacitor rated","n","µF","a",0],["capacitor_compressor_actual","Compressor capacitor measured","n","µF","a",0],["capacitor_fan_rated","Fan capacitor rated","n","µF","a",0],["capacitor_fan_actual","Fan capacitor measured","n","µF","a",0],["voltage","Measured voltage","n","V","a",0],["static_pressure","External static pressure","n","in w.c.","a",0],["suction_pressure","Suction pressure","n","PSIG","c",0],["discharge_pressure","Discharge pressure","n","PSIG","c",0],["evaporator_saturation","Evaporator saturation","n","°F","c",0],["condensing_saturation","Condensing saturation","n","°F","c",0],["suction_line_temperature","Suction line temperature","n","°F","c",0],["liquid_line_temperature","Liquid line temperature","n","°F","c",0],["superheat","Superheat","n","°F","c",0],["subcooling","Subcooling","n","°F","c",0],["filter","Filter condition","c","","e",0],["blower","Blower/cabinet","c","","e",0],["indoor_coil","Indoor coil","c","","e",0],["outdoor_coil","Outdoor coil/debris","c","","e",0],["drain","Condensate drain/trap/pan","c","","e",0],["float_switch","Float switch","c","","e",0],["contactor","Contactor condition/pitting","c","","e",0],["wiring","Electrical connections","c","","e",0],["shutoff","Service/emergency shutoff","c","","e",0],["venting","Venting observation","c","","e",0],["gas_piping","Gas piping/access observation","c","","e",0],["ignition","Ignition/flame sensing","c","","e",0],["safety_controls","Safety controls","c","","e",0],["auxiliary_heat","Auxiliary heat","c","","e",0],["defrost","Defrost","c","","e",0],["iaq","IAQ/accessories","c","","e",0],["ambient_co","Ambient CO","n","ppm","x",0],["flue_co","Flue CO","n","ppm","x",0],["oxygen","Oxygen","n","%","x",0],["flue_temperature","Flue temperature","n","°F","x",0],["flame_signal","Flame signal","n","µA","x",0]];/* [key,label,type t|n|c,unit,applies a|e|c|x,required] from template eagle-field-hvac-v1 */
+const INSP_RESULTS={pass:'Pass',attention:'Needs attention',fail:'Fail',not_tested:'Not tested',not_applicable:'Not applicable'};
+const INSP_REASON=['attention','fail','not_tested'];
+function eqProfile(e){const k=String(e.type||'').toLowerCase(),f=String(e.fuel||'').toLowerCase();const hp=/heat.?pump|mini.?split/.test(k);const cool=hp||/air.?condition|\bac\b|condenser|package|mini.?split/.test(k);
+  const gasF=f==='gas'||f==='propane';const comb=/gas.?furnace|oil.?furnace|boiler/.test(k)||gasF||f==='oil';const gas=comb&&(gasF||/gas.?furnace/.test(k));const el=/electric.?furnace|air.?handler/.test(k)||(hp&&!comb);return {cooling:cool,heatPump:hp,combustion:comb,gas,electricHeat:el}}
+const INSP_DEP={indoor_coil:p=>p.cooling,outdoor_coil:p=>p.cooling,drain:p=>p.cooling||p.combustion,float_switch:p=>p.cooling,contactor:p=>p.cooling,venting:p=>p.combustion,gas_piping:p=>p.gas,ignition:p=>p.combustion,safety_controls:p=>p.combustion||p.electricHeat,auxiliary_heat:p=>p.heatPump,defrost:p=>p.heatPump};
+const inspApplies=(f,p)=>f[4]==='a'?true:f[4]==='c'?(p.cooling||p.heatPump):f[4]==='x'?p.combustion:(INSP_DEP[f[0]]||(()=>true))(p);
+const rv=v=>{if(v===null||v===undefined)return null;const s=String(v).trim();if(!s)return null;const n=Number(s);return isFinite(n)?n:null};
+function inspBlockers(a,p,c){const out=[];INSP_FIELDS.forEach(f=>{if(!inspApplies(f,p))return;const x=a[f[0]]||{};
+  if(f[2]==='c'){if(x.result&&INSP_REASON.includes(x.result)&&!String(x.reason||'').trim())out.push(`${f[1]}: explain why it's ${INSP_RESULTS[x.result].toLowerCase()}`);if(f[5]&&!x.result)out.push(f[1]+': required')}
+  else if(f[2]==='n'){if(f[5]&&rv(x.value)===null)out.push(f[1]+': required reading')}else if(f[5]&&!String(x.value??'').trim())out.push(f[1]+': required')});
+  if(!c.attest)out.push('Confirm the readings and results are your own');if(!c.reviewed)out.push('Review the findings');if(!String(c.debrief||'').trim())out.push('Customer debrief status');
+  if(!String(c.next||'').trim())out.push('Next maintenance date or reason');if(!String(c.sign||'').trim())out.push('Signature, or why not');return out}
+const split=a=>{const r=rv(a.return_temperature&&a.return_temperature.value),s=rv(a.supply_temperature&&a.supply_temperature.value);return r===null||s===null?null:{cool:Math.round((r-s)*10)/10,rise:Math.round((s-r)*10)/10}};
+function inspOf(j,i){j.inspections=j.inspections||{};return j.inspections[i]}
+function inspPanel(j,office){
+  const c=cust(j.customerId);if(!c||!c.equipment.length)return '';
+  const rows=c.equipment.map((e,i)=>{const x=inspOf(j,i);const st=!x?'Not started':x.status==='draft'?'Draft':`${x.status==='reviewed'?'Reviewed':'Submitted'} · v${x.version}`;
+    return `<div class="queue-item"><div><b>${esc(e.type)}</b> <span class="muted">${esc([e.brand,e.model].filter(Boolean).join(' '))}${e.location?' · '+esc(e.location):''}</span><div class="note">${st}</div></div>
+     <div class="row">${x&&x.status!=='draft'?`<button class="btn sm" data-act="insp-report" data-id="${j.id}" data-k="${i}">Report</button>`:''}${office&&!(x&&x.status!=='draft')?'':`<button class="btn sm ${x?'':'primary'}" data-act="insp-open" data-id="${j.id}" data-k="${i}">${!x||x.status==='draft'?'Inspect':'Open'}</button>`}</div></div>`}).join('');
+  const fs=(j.findings||[]);
+  return `<div class="panel pad stack"><div class="row" style="justify-content:space-between"><h3>System inspections</h3><span class="note">One per system</span></div>${rows}
+   ${fs.length?`<span class="label">Findings</span>${fs.map((f,fi)=>`<div class="queue-item"><div><b>${esc(f.component)}</b> <span class="chip ${f.severity==='safety'?'s-review':''}">${esc(f.severity)}</span> <span class="note">${esc(f.state)}</span><div class="note">${esc(f.observation)}${f.recommendation?' · Recommended: '+esc(f.recommendation):''}${f.work?' · Work: '+esc(f.work):''}</div>${f.followUp?`<div class="note">Follow-up: ${esc(f.followUp)}</div>`:''}</div>${f.state!=='corrected'?`<button class="btn sm" data-act="insp-fix" data-id="${j.id}" data-k="${fi}">Log work</button>`:''}</div>`).join('')}`:''}</div>`;
+}
+function drawInsp(){
+  const o=$('#inspOverlay');const u=ui.insp;const j=u&&job(u.jobId);
+  if(!u||!j){o.hidden=true;o.innerHTML='';return}
+  const c=cust(j.customerId);const e=c.equipment[u.i];const p=eqProfile(e);
+  const x=inspOf(j,u.i);const lock=x.status!=='draft'&&!u.amend;const dis=lock?'disabled':'';const a=u.draft.answers,cl=u.draft.closeout;
+  const fld=f=>{const v=a[f[0]]||{};if(f[2]==='c')return `<div class="field"><label class="label">${esc(f[1])}${f[5]?' *':''}</label><select data-ik="${f[0]}" data-it="result" ${dis}><option value="">Not recorded</option>${Object.entries(INSP_RESULTS).map(([k,l])=>`<option value="${k}" ${v.result===k?'selected':''}>${l}</option>`).join('')}</select>${INSP_REASON.includes(v.result)?`<input data-ik="${f[0]}" data-it="reason" placeholder="Why? (required)" value="${esc(v.reason||'')}" ${dis}>`:''}</div>`;
+    if(f[2]==='n')return `<div class="field"><label class="label">${esc(f[1])}</label><div class="row" style="flex-wrap:nowrap;gap:6px"><input data-ik="${f[0]}" data-it="value" inputmode="decimal" placeholder="—" value="${v.value??''}" style="flex:1;min-width:0" ${dis}><span class="note" style="min-width:42px">${esc(f[3])}</span></div></div>`;
+    return `<div class="field"><label class="label">${esc(f[1])}${f[5]?' *':''}</label><input data-ik="${f[0]}" data-it="value" value="${esc(v.value||'')}" ${dis}></div>`};
+  const ap=INSP_FIELDS.filter(f=>inspApplies(f,p));const hidden=INSP_FIELDS.length-ap.length;
+  const sp=split(a);const bl=lock?[]:inspBlockers(a,p,cl);
+  o.hidden=false;
+  o.innerHTML=`<div class="trk-back" data-act="insp-close"></div><div class="insp-sheet" role="dialog" aria-label="System inspection">
+   <div class="row" style="justify-content:space-between"><div><span class="label">${esc(j.customer)} · ${esc(j.id)}</span><h2 style="margin:2px 0 0">${esc(e.type)} <span class="muted" style="font-weight:500">${esc(e.brand||'')}</span></h2></div><div class="row"><span class="chip">${lock?(x.status==='reviewed'?'Reviewed':'Submitted')+' · v'+x.version:u.dirty?'Unsaved changes':'Draft · saved'}</span><button class="btn sm" data-act="insp-close">Close</button></div></div>
+   <p class="note" style="margin:0">${hidden} questions hidden because they don't apply to this ${esc(String(e.type).toLowerCase())}${p.gas?'':' (no gas questions)'}. Leave readings you didn't take blank; blank isn't zero. Nothing is marked pass unless you mark it.</p>
+   <h4 class="insp-h">Equipment</h4><div class="grid2">${ap.filter(f=>f[2]==='t').map(fld).join('')}</div>
+   <h4 class="insp-h">Readings</h4><div class="insp-grid">${ap.filter(f=>f[2]==='n').map(fld).join('')}</div>
+   <div class="banner" style="font-weight:400">${sp?`Cooling split (return − supply): <b>&nbsp;${sp.cool} °F</b>&nbsp;· Heating rise: <b>&nbsp;${sp.rise} °F</b>. Compare to the manufacturer's spec; Eagle Field doesn't grade it.`:'Enter return and supply temperatures to see the split.'}</div>
+   <h4 class="insp-h">Checks</h4><div class="grid2">${ap.filter(f=>f[2]==='c').map(fld).join('')}</div>
+   <h4 class="insp-h">Closeout</h4>
+   <label class="row"><input type="checkbox" data-ic="attest" ${cl.attest?'checked':''} ${dis}> These readings and results are my own observations</label>
+   <label class="row"><input type="checkbox" data-ic="reviewed" ${cl.reviewed?'checked':''} ${dis}> I reviewed the findings</label>
+   <div class="grid2"><div class="field"><label class="label">Customer debrief</label><input data-ic="debrief" value="${esc(cl.debrief||'')}" placeholder="Walked through on site" ${dis}></div>
+   <div class="field"><label class="label">Next maintenance (date or reason)</label><input data-ic="next" value="${esc(cl.next||'')}" placeholder="${addDays(today(),180)}" ${dis}></div>
+   <div class="field"><label class="label">Signature, or why not</label><input data-ic="sign" value="${esc(cl.sign||'')}" placeholder="Signed on tablet" ${dis}></div></div>
+   <div class="field"><label class="label">Internal notes (never on the customer report)</label><textarea data-ic="notes" rows="2" ${dis}>${esc(cl.notes||'')}</textarea></div>
+   ${u.amend?'<div class="field"><label class="label">Reason for the change *</label><input id="inspReason" placeholder="Read model from tag photo"></div>':''}
+   ${bl.length?`<div class="banner wait" style="font-weight:400"><div><b>${bl.length} item${bl.length>1?'s':''} before you can submit</b><ul style="margin:6px 0 0;padding-left:18px">${bl.map(b=>`<li>${esc(b)}</li>`).join('')}</ul></div></div>`:''}
+   <div class="row">${!lock&&!u.amend?`<button class="btn" data-act="insp-save">Save draft</button><button class="btn primary" data-act="insp-submit" ${bl.length?'disabled':''}>Submit inspection</button>`:u.amend?'<button class="btn primary" data-act="insp-amend-save">Save amendment</button>':'<button class="btn" data-act="insp-amend">Amend</button>'}</div>
+   ${x.versions&&x.versions.length?`<div class="note">${x.versions.map(v=>`v${v.v} · ${esc(v.by)} · ${fmt(v.at)} · ${esc(v.reason)}`).join('<br>')}</div>`:''}
+   ${!lock?`<details><summary class="label">Add a finding</summary><div class="grid2" style="margin-top:8px"><div class="field"><label class="label">Component</label><input id="ifC" placeholder="Condensate drain"></div><div class="field"><label class="label">Severity</label><select id="ifS"><option value="recommended">Recommended</option><option value="urgent">Urgent</option><option value="safety">Safety</option><option value="informational">Informational</option></select></div></div><div class="field"><label class="label">What you observed</label><input id="ifO"></div><div class="field"><label class="label">Recommendation</label><input id="ifR"></div><button class="btn sm" data-act="insp-finding">Add finding</button></details>`:''}
+  </div>`;
+}
+const qa=s=>[...document.querySelectorAll(s)];
+function inspCollect(){const u=ui.insp;qa('#inspOverlay [data-ik]').forEach(el=>{const k=el.dataset.ik;u.draft.answers[k]=u.draft.answers[k]||{};u.draft.answers[k][el.dataset.it]=el.dataset.it==='value'&&INSP_FIELDS.find(f=>f[0]===k)[2]==='n'?rv(el.value):el.value});
+  qa('#inspOverlay [data-ic]').forEach(el=>{u.draft.closeout[el.dataset.ic]=el.type==='checkbox'?el.checked:el.value})}
+document.addEventListener('input',e=>{if(!e.target.closest||!e.target.closest('#inspOverlay'))return;if(!ui.insp)return;inspCollect();ui.insp.dirty=true;if(e.target.tagName==='SELECT'||/return_temperature|supply_temperature/.test(e.target.dataset.ik||'')){const f=document.activeElement&&document.activeElement.dataset;const k=f&&f.ik,t=f&&f.it;drawInsp();if(k){const el=document.querySelector(`#inspOverlay [data-ik="${k}"][data-it="${t}"]`);if(el){el.focus();if(el.setSelectionRange&&el.type!=='select-one'){try{el.setSelectionRange(el.value.length,el.value.length)}catch(_){}}}}}else{const b=$('#inspOverlay .chip');if(b)b.textContent='Unsaved changes'}});
+function inspReport(j,i){const c=cust(j.customerId);const e=c.equipment[i];const x=inspOf(j,i);const p=eqProfile(e);const sp=split(x.answers);
+  const rows=INSP_FIELDS.filter(f=>inspApplies(f,p)&&x.answers[f[0]]).map(f=>{const v=x.answers[f[0]];const val=f[2]==='n'?(rv(v.value)===null?null:`${v.value} ${f[3]}`):f[2]==='c'?(v.result?INSP_RESULTS[v.result]+(v.reason?' — '+v.reason:''):null):v.value;return val?`<tr><td>${esc(f[1])}</td><td>${esc(val)}</td></tr>`:''}).join('');
+  const fs=(j.findings||[]).filter(f=>f.i===i);
+  const o=$('#inspOverlay');o.hidden=false;o.innerHTML=`<div class="trk-back" data-act="insp-close"></div><div class="insp-sheet" role="dialog" aria-label="Customer inspection report"><div class="row" style="justify-content:space-between"><div><span class="label">Customer report · v${x.version}</span><h2 style="margin:2px 0 0">${esc(S.company)}</h2></div><button class="btn sm" data-act="insp-close">Close</button></div>
+   <p class="muted" style="margin:0">${esc(j.customer)} · ${esc(j.address)} · ${esc(e.type)} ${esc(e.brand||'')}</p>
+   <div class="tablewrap"><table><tbody>${rows}</tbody></table></div>${sp&&p.cooling?`<p class="note" style="margin:0">Cooling split: ${sp.cool} °F</p>`:''}
+   ${fs.length?`<b>Findings</b>${fs.map(f=>`<div class="note">${esc(f.component)} (${esc(f.severity)}): ${esc(f.observation)}${f.recommendation?' · Recommended: '+esc(f.recommendation):''}</div>`).join('')}`:''}
+   <p class="note" style="margin:0">Internal notes are never shown on this report.</p></div>`}
 function drawTrack(){
   const o=$('#trackOverlay');const j=ui.trackJob&&job(ui.trackJob);
   if(!j){o.hidden=true;o.innerHTML='';return}
@@ -1783,6 +1886,16 @@ document.addEventListener('click',e=>{
     case 'open-tech-job':ui.techJob=id;ui.stepTab=0;render();break;
     case 'back-queue':ui.techJob=null;render();break;
     case 'enroute':j.enroute={at:now(),progress:0};log(j,'On the way; customer tracking link sent');save();render();toast('On your way. '+j.customer.split(' ')[0]+' can follow your van until you arrive.');break;
+    case 'insp-open':{const i=+b.dataset.k;j.inspections=j.inspections||{};if(!j.inspections[i]){const eq=cust(j.customerId).equipment[i];const pre={};[['equipment_label',[eq.location,eq.type].filter(Boolean).join(' ')],['make',eq.brand],['equipment_type',eq.type],['model',eq.model],['fuel',eq.fuel]].forEach(([k,v])=>{if(v)pre[k]={value:v}});j.inspections[i]={status:'draft',version:0,answers:pre,closeout:{},versions:[]};log(j,'Inspection started: '+cust(j.customerId).equipment[i].type);save()}const x=j.inspections[i];ui.insp={jobId:j.id,i,draft:{answers:JSON.parse(JSON.stringify(x.answers)),closeout:JSON.parse(JSON.stringify(x.closeout))},dirty:false,amend:false};drawInsp();break}
+    case 'insp-close':ui.insp=null;drawInsp();render();break;
+    case 'insp-save':{inspCollect();const u=ui.insp,jj=job(u.jobId),x=inspOf(jj,u.i);x.answers=u.draft.answers;x.closeout=u.draft.closeout;u.dirty=false;save();drawInsp();toast('Draft saved.');break}
+    case 'insp-submit':{inspCollect();const u=ui.insp,jj=job(u.jobId),x=inspOf(jj,u.i),e=cust(jj.customerId).equipment[u.i];const bl=inspBlockers(u.draft.answers,eqProfile(e),u.draft.closeout);if(bl.length){toast('Finish the listed items first.');drawInsp();return}
+      x.answers=u.draft.answers;x.closeout=u.draft.closeout;x.status='submitted';x.version=1;x.versions=[{v:1,by:whoName(),at:now(),reason:'Submitted'}];log(jj,`Inspection submitted: ${e.type}`);save();ui.insp=null;drawInsp();render();toast('Inspection submitted.');break}
+    case 'insp-amend':ui.insp.amend=true;drawInsp();break;
+    case 'insp-amend-save':{const r=($('#inspReason').value||'').trim();if(!r){toast('Give a reason for the change.');return}inspCollect();const u=ui.insp,jj=job(u.jobId),x=inspOf(jj,u.i);x.answers=u.draft.answers;x.closeout=u.draft.closeout;x.version++;x.status='submitted';x.versions.push({v:x.version,by:whoName(),at:now(),reason:r});log(jj,`Inspection amended to v${x.version}: ${r}`);save();u.amend=false;drawInsp();toast(`Saved as version ${x.version}. The earlier version is kept.`);break}
+    case 'insp-finding':{const u=ui.insp,jj=job(u.jobId);const comp=$('#ifC').value.trim(),obs=$('#ifO').value.trim();if(!comp||!obs){toast('Say what component and what you observed.');return}jj.findings=jj.findings||[];jj.findings.push({i:u.i,component:comp,observation:obs,severity:$('#ifS').value,recommendation:$('#ifR').value.trim(),state:'observed'});log(jj,`Finding: ${comp} (${$('#ifS').value})`);save();inspCollect();drawInsp();toast('Finding added.');break}
+    case 'insp-fix':{const f=j.findings[+b.dataset.k];f.work=f.work||'Repaired and verified on site';f.state='corrected';log(j,`Work logged; finding corrected: ${f.component}`);save();render();toast('Work logged. Finding marked corrected.');break}
+    case 'insp-report':inspReport(j,+b.dataset.k);break;
     case 'va-start':{ui.va={jobId:id,stage:'link',token:Math.random().toString(36).slice(2,14)+Math.random().toString(36).slice(2,14),marks:[],snaps:[],tool:'point',torch:false,facing:'environment',say:'',save:true};log(j,'Video Assist link sent to the customer');save();drawVA();break}
     case 'va-open':ui.va.stage='consent';drawVA();break;
     case 'va-approve':{if(!$('#vaCamOk').checked){toast('The customer needs to allow camera and microphone to start.');return}ui.va.save=$('#vaSaveOk').checked;ui.va.stage='live';const jj=job(ui.va.jobId);log(jj,`Customer approved Video Assist${ui.va.save?' and allowed photos on their record':''}`);save();drawVA();break}
